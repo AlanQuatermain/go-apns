@@ -1,5 +1,5 @@
 /*
- * buffer.go
+ * feedback.go
  * go-apns
  * 
  * Created by Jim Dovey on 16/08/2011.
@@ -38,47 +38,3 @@
 
 package apns
 
-import (
-	"encoding/binary"
-)
-
-var wire = binary.BigEndian
-
-type buffer []byte
-
-func (b *buffer) next(n int) []byte {
-	begin := len(*b)
-	end := begin + n
-	if end > cap(*b) {
-		noob := make([]byte, begin, 2*cap(*b)+n)
-		copy(noob, *b)
-		*b = noob
-	}
-	*b = (*b)[:end]
-	return (*b)[begin:end]
-}
-
-func (b *buffer) writeString(s string) {
-	wire.PutUint32(b.next(4), len(s))
-	copy(b.next(len(s)), s)
-}
-
-func (b *buffer) writeBytes(p []byte) {
-	copy(b.next(len(p)), p)
-}
-
-func (b *buffer) writeByte(v byte) {
-	b.next(1)[0] = v
-}
-
-func (b *buffer) writeUint17(v uint16) {
-	wire.PutUint16(b.Next(2), v)
-}
-
-func (b *buffer) writeUint32(v uint32) {
-	wire.PutUint32(b.next(4), v)
-}
-
-func (b *buffer) writeUint64(v uint64) {
-	wire.PutUint64(b.next(8), v)
-}

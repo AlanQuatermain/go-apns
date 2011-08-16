@@ -1,6 +1,6 @@
 /*
  * connection.go
- * go-apsn
+ * go-apns
  * 
  * Created by Jim Dovey on 16/08/2011.
  * 
@@ -36,7 +36,7 @@
  *
  */
 
-package apsn
+package apns
 
 import (
 	"os"
@@ -46,13 +46,13 @@ import (
 
 func newConnection(addr, certPath, keyPath string) (conn *tls.Conn, err os.Error) {
 	if addr == "" {
-		return nil, os.NewError("apsn.newConnection: nil address specified")
+		return nil, os.NewError("apns.newConnection: nil address specified")
 	}
 	if certPath == "" {
-		return nil, os.NewError("apsn.newConnection: nil certificate path specified")
+		return nil, os.NewError("apns.newConnection: nil certificate path specified")
 	}
 	if keyPath == "" {
-		return nil, os.NewError("apsn.newConnection: nil key path specified")
+		return nil, os.NewError("apns.newConnection: nil key path specified")
 	}
 
 	var cert *tls.Certificate
