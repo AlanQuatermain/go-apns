@@ -1,6 +1,6 @@
 /*
- * apsn.go
- * go-apsn
+ * apns.go
+ * go-apns
  * 
  * Created by Jim Dovey on 16/08/2011.
  * 
@@ -36,7 +36,7 @@
  *
  */
 
-package apsn
+package apns
 
 import (
 	"os"
@@ -83,16 +83,16 @@ type result struct {
 	identifier uint32
 }
 
-type Apsn struct {
+type Apns struct {
 	conn           *tls.Conn
 	revocationList []string
 	waitReplies    map[uint32]chan result
 }
 
-func replyServer(apsn *Apsn) {
+func replyServer(apns *Apns) {
 	buf := make([]byte, 25)
 	for {
-		n, err := apsn.conn.Read(buf)
+		n, err := apns.conn.Read(buf)
 		if err != nil && err != os.EAGAIN {
 			log.Fatal("replyServer:", err)
 		}
@@ -102,7 +102,7 @@ func replyServer(apsn *Apsn) {
 			r.identifier = wire.Uint32(buf[1:])
 
 			// send the reply to anyone waiting for a response
-			ch := apsn.waitReplies[r.identifier]
+			ch := apns.waitReplies[r.identifier]
 			if ch != nil {
 				ch <- r
 			}
@@ -110,24 +110,24 @@ func replyServer(apsn *Apsn) {
 	}
 }
 
-func NewConnection(addr string) (*Apsn, os.Error) {
+func NewConnection(addr string) (*Apns, os.Error) {
 	conn, err := newConnection(addr, "cert.pem", "pkey.pem")
 	if err != nil {
 		return nil, err
 	}
 
-	apsn := &Apsn{conn: conn}
-	err = apsn.loadRevocationList()
+	apns := &Apns{conn: conn}
+	err = apns.loadRevocationList()
 	if err != nil {
 		return nil, err
 	}
-	return apsn, nil
+	return apns, nil
 }
 
-func (a *Apsn) loadRevocationList() os.Error {
+func (a *Apns) loadRevocationList() os.Error {
 	f, err := os.Open("revocationList", os.WRONLY|os.O_CREATE|os.O_APPEND, 0544)
 	if err != nil {
-		log.Fatal("Apsn.loadRecovationList:", err)
+		log.Fatal("apns.loadRecovationList:", err)
 	}
 	defer f.Close()
 
@@ -148,7 +148,7 @@ func (a *Apsn) loadRevocationList() os.Error {
 	return err
 }
 
-func (a *Apsn) SendMessage(identifier, expiry uint32, token []byte, payload interface{}) (<-chan *os.Error, os.Error) {
+func (a *Apns) SendMessage(identifier, expiry uint32, token []byte, payload interface{}) (<-chan *os.Error, os.Error) {
 	buf := make([]byte, 256).(*buffer)
 
 	if identifier == 0 && expiry == 0 {
