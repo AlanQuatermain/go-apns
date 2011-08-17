@@ -83,10 +83,14 @@ type result struct {
 	identifier uint32
 }
 
+type DeviceToken [32]byte
+
+var revocationList []DeviceToken
+var saver chan DeviceToken = make(chan DeviceToken, 100)
+
 type Apns struct {
-	conn           *tls.Conn
-	revocationList []string
-	waitReplies    map[uint32]chan result
+	conn        *tls.Conn
+	waitReplies map[uint32]chan result
 }
 
 func replyServer(apns *Apns) {
@@ -131,19 +135,20 @@ func (a *Apns) loadRevocationList() os.Error {
 	}
 	defer f.Close()
 
-	if a.revocationList == nil {
-		a.revocationList = make([]string, 5)
+	if revocationList == nil {
+		revocationList = make([]DeviceToken, 5)
 	}
 
 	d := gob.NewDecoder(f)
 	for err == nil {
-		var s string
-		if err = d.Decode(&s); err == nil {
-			a.revocationList = append(a.revocationList, s)
+		var t DeviceToken
+		if err = d.Decode(&t); err == nil {
+			revocationList = append(revocationList, t)
 		}
 	}
 	if err == os.EOF {
 		return nil
+		go saveLoop()
 	}
 	return err
 }
@@ -217,4 +222,26 @@ func (a *Apns) SendMessage(identifier, expiry uint32, token []byte, payload inte
 	}
 
 	return errchan, nil
+}
+
+func revokeDeviceToken(token DeviceToken) {
+	if saver != nil {
+		saver <- token
+	}
+}
+
+func saveLoop() {
+	f, err := os.Open(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0664)
+	if err != nil {
+		log.Fatal("Failed to open revocationList file:", err)
+	}
+	defer f.Close()
+
+	e := gob.NewEncoder(f)
+	for {
+		r := <-saver
+		if err := e.Encode(r); err != nil {
+			log.Println("Failed to encode device token for revocation list:", err)
+		}
+	}
 }

@@ -38,3 +38,78 @@
 
 package apns
 
+import (
+	"os"
+	"time"
+	"crypto/tls"
+)
+
+var quitChan chan chan bool = make(chan chan bool, 1)
+var addresses = map[bool]string{
+	true:  "feedback.sandbox.push.apple.com",
+	false: "feedback.push.apple.com",
+}
+
+func feedbackMonitor(config *tls.Config, useSandbox bool) {
+	for {
+		timer := time.NewTimer(5 * 60 * 1000000000) // five minutes
+		select {
+		case ch := <-quitChan:
+			// been told to quit
+			ch <- true
+			return
+		case <-timer.C:
+			// timer fired, talk to the feedback server
+			conn, err := tls.Dial("tcp", addresses[useSandbox], config)
+			if err != nil {
+				log.Println("Failed to dial feedback server:", err)
+				break
+			}
+
+			// once connected, the server immediately sends us our data
+			var buf [38]byte
+			for {
+				n, err := conn.Read(buf[:])
+				if err != nil {
+					if err != os.EOF {
+						log.Println("Failed to read feedback message:", err)
+					}
+					break
+				}
+
+				// four-byte time, in seconds
+				time_unused := wire.Uint32(buf[0:])
+				// two byte token size (always 32)
+				size_unused := wire.Uint16(buf[4:])
+
+				// get the device token itself
+				var token DeviceToken
+				copy(token[:], buf[6:])
+
+				// store the token in the revocation list
+				revokeDeviceToken(token)
+			}
+
+			conn.Close()
+		}
+	}
+}
+
+func startFeedbackMonitor(certPath, keyPath string, useSandbox bool) os.Error {
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return err
+	}
+
+	config := &tls.Config{Certificates: []Certificate{cert}}
+	go feedbackMonitor(config, useSandbox)
+	return nil
+}
+
+func stopFeedbackMonitor() {
+	ch := make(chan bool, 1)
+	// tell the goroutine to stop
+	quitChan <- ch
+	// wait for it to do so
+	<-ch
+}
